@@ -121,16 +121,23 @@ public class KeySimCommand implements IClientCommand {
             if (bind.getKeyDescription().equalsIgnoreCase(keyArg)) {
                 System.out.println("Keycode: " + bind.getKeyCode());
 
+                int dummyKeyCode = -1;
+                int bindKeyCode = -1;
                 if (swap) {
-                    int dummyKeyCode = KeyBindings.dummyKey.getKeyCode();
+                    dummyKeyCode = KeyBindings.dummyKey.getKeyCode();
+
+                    if (dummyKeyCode == 0)
+                    {
+                        error("Error: " + KeyBindings.dummyKey.getKeyDescription() + " is not set.");
+                        return;
+                    }
+
                     KeyBindings.dummyKey.setKeyCode(0);
 
-                    int bindKeyCode = bind.getKeyCode();
+                    bindKeyCode = bind.getKeyCode();
                     bind.setKeyCode(dummyKeyCode);
 
                     KeyBinding.resetKeyBindingArrayAndHash();
-
-                    System.out.println("Swapping, new keycode: " + bind.getKeyCode());
                 }
 
                 switch(methodArg) {
@@ -139,10 +146,11 @@ public class KeySimCommand implements IClientCommand {
                     case WORLD:
 
                         if (ticksArg != -1)
-                            KeyResets.add(new KeyReset(bind, ticksArg));
+                            KeyResets.add(new KeyReset(bind, -1, ticksArg, dummyKeyCode, bindKeyCode));
 
                         if (methodArg.equals(TICK)) KeyBinding.onTick(bind.getKeyCode());
                         else if (methodArg.equals(WORLD)) trigger = bind;
+                        mc.currentScreen.setFocused(false);
 
                         return;
 
@@ -169,8 +177,9 @@ public class KeySimCommand implements IClientCommand {
                             }
 
                             ROBOT.keyPress(key);
+                            mc.currentScreen.setFocused(false);
                             if (ticksArg != -1)
-                                KeyResets.add(new KeyReset(key, ticksArg));
+                                KeyResets.add(new KeyReset(bind, key, ticksArg, dummyKeyCode, bindKeyCode));
                         }
                         catch (IllegalAccessException e)
                         {
@@ -200,14 +209,20 @@ public class KeySimCommand implements IClientCommand {
             for (int i = KeyResets.size() - 1; i >= 0; i--)
             {
                 KeyReset kr = KeyResets.get(i);
-                kr.incrementTick();
-                if (kr.getCurrentTick() >= kr.getTickCount()) {
+                if (kr.incrementTick()) {
                     System.out.println("Released key after " + kr.getCurrentTick() + " ticks.");
 
-                    if (kr.isKeybind())
-                        KeyBinding.setKeyBindState(kr.getKeyBinding().getKeyCode(), false);
+                    if (kr.doSystemInput())
+                        ROBOT.keyRelease(kr.getSystemVK());
                     else
-                        ROBOT.keyRelease(kr.getKeyCode());
+                        KeyBinding.setKeyBindState(kr.getKeyBinding().getKeyCode(), false);
+
+                    if (kr.doKeySwap())
+                    {
+                        KeyBindings.dummyKey.setKeyCode(kr.getDummyKeyCode());
+                        kr.getKeyBinding().setKeyCode(kr.getBindKeyCode());
+                        KeyBinding.resetKeyBindingArrayAndHash();
+                    }
 
                     KeyResets.remove(kr);
                 }
