@@ -5,9 +5,9 @@ import net.minecraft.client.settings.KeyBinding;
 import net.minecraftforge.fml.client.registry.ClientRegistry;
 
 public class KeyBindings {
-    public static KeyBinding keepForward;
+    public static KeyBinding dummyKey;
     public static void init() {
-        keepForward = new KeyBinding("key.keepForward", Keyboard.KEY_O, "key.categories.Autowalk");
-        ClientRegistry.registerKeyBinding(keepForward);
+        dummyKey = new KeyBinding("key.dummyKey", Keyboard.KEY_O, "key.categories.KeySim");
+        ClientRegistry.registerKeyBinding(dummyKey);
     }
 }

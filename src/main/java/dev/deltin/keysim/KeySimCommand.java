@@ -12,6 +12,7 @@ import net.minecraftforge.client.IClientCommand;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 import net.minecraft.util.text.TextComponentString;
+import org.lwjgl.Sys;
 
 import javax.annotation.Nullable;
 import java.awt.*;
@@ -26,16 +27,13 @@ public class KeySimCommand implements IClientCommand {
     public static final String TICK = "ontick";
     public static final String WORLD = "world";
     public static final String SIM = "sim";
-    // Press methods
-    public static final String TOGGLE = "toggle";
-    public static final String PRESS = "press";
     // Command info
     public static final String COMMAND_NAME = "keysim";
     public static final String ALIAS = "/" + COMMAND_NAME;
-    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] [" + TOGGLE + "|" + PRESS + " (ticks)] (switch [true|false])";
+    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] (ticks|toggle|keyswap) (close [true|false])";
     // Reset info
     private static final List<KeyReset> KeyResets = new ArrayList<>();
-    // private static final int TICKS_UNTIL_RESET = 40;
+    private static final int DEFAULT_TICK_RESET = 40;
     // Input
     private static Robot ROBOT = null;
     private static final Field[] VK_KEYCODES = java.awt.event.KeyEvent.class.getDeclaredFields();
@@ -89,28 +87,31 @@ public class KeySimCommand implements IClientCommand {
 
         String keyArg = args[0];
         String methodArg = args[1];
-
-        String pressArg = PRESS;
-        int ticksArg = 40;
+        int ticksArg = DEFAULT_TICK_RESET;
+        Boolean swap = false;
 
         if (args.length >= 3)
         {
-            pressArg = args[2];
-            if (!pressArg.equals(PRESS) && !pressArg.equals(TOGGLE))
+            try
             {
-                printUsage();
-                return;
+                ticksArg = Integer.parseInt(args[2]);
+                if (ticksArg <= 0)
+                    ticksArg = DEFAULT_TICK_RESET;
             }
-
-            if (args.length >= 4)
+            catch (NumberFormatException e)
             {
-                try
+                if (args[2].equalsIgnoreCase("toggle"))
+                    ticksArg = -1;
+                else if (args[2].equalsIgnoreCase("keyswap"))
                 {
-                    ticksArg = Integer.parseInt(args[3]);
-                    if (ticksArg <= 0)
-                        ticksArg = 40;
+                    swap = true;
+                    ticksArg = DEFAULT_TICK_RESET;
                 }
-                catch (NumberFormatException e) {}
+                else
+                {
+                    printUsage();
+                    return;
+                }
             }
         }
 
@@ -119,12 +120,25 @@ public class KeySimCommand implements IClientCommand {
         for (KeyBinding bind : mc.gameSettings.keyBindings) {
             if (bind.getKeyDescription().equalsIgnoreCase(keyArg)) {
                 System.out.println("Keycode: " + bind.getKeyCode());
+
+                if (swap) {
+                    int dummyKeyCode = KeyBindings.dummyKey.getKeyCode();
+                    KeyBindings.dummyKey.setKeyCode(0);
+
+                    int bindKeyCode = bind.getKeyCode();
+                    bind.setKeyCode(dummyKeyCode);
+
+                    KeyBinding.resetKeyBindingArrayAndHash();
+
+                    System.out.println("Swapping, new keycode: " + bind.getKeyCode());
+                }
+
                 switch(methodArg) {
 
                     case TICK:
                     case WORLD:
 
-                        if (pressArg.equals(PRESS))
+                        if (ticksArg != -1)
                             KeyResets.add(new KeyReset(bind, ticksArg));
 
                         if (methodArg.equals(TICK)) KeyBinding.onTick(bind.getKeyCode());
@@ -145,16 +159,18 @@ public class KeySimCommand implements IClientCommand {
                             for (Field f : VK_KEYCODES) {
                                 if (Modifier.isStatic(f.getModifiers()) && f.getName().equals("VK_" + bind.getDisplayName())) {
                                     key = (int)f.get(null);
+                                    System.out.println("Keycode: " + f.getName() + " (" + key + ")");
                                 }
                             }
 
                             if (key == -1) {
-                                error("Error: Invalid key \"" + bind.getDisplayName() + "\" (\"" + "VK_" + bind.getDisplayName() + "\")");
+                                error("Error: Invalid key " + bind.getDisplayName() + " (" + "VK_" + bind.getDisplayName() + "), rebind it to something else!");
                                 return;
                             }
 
                             ROBOT.keyPress(key);
-                            KeyResets.add(new KeyReset(key, ticksArg));
+                            if (ticksArg != -1)
+                                KeyResets.add(new KeyReset(key, ticksArg));
                         }
                         catch (IllegalAccessException e)
                         {
@@ -174,8 +190,8 @@ public class KeySimCommand implements IClientCommand {
 
     @SubscribeEvent
     public void keyUpdate(TickEvent event) { // TickEvent  /  ClientTickEvent?
+
         if (trigger != null) {
-            //KeyBinding bind = FMLClientHandler.instance().getClient().gameSettings.keyBindJump;
             KeyBinding.setKeyBindState(trigger.getKeyCode(), true);
             trigger = null;
         }
@@ -214,7 +230,7 @@ public class KeySimCommand implements IClientCommand {
         {
             case 1:
                 for (KeyBinding bind : Minecraft.getMinecraft().gameSettings.keyBindings)
-                    if (args[0].length() < bind.getKeyDescription().length() && bind.getKeyDescription().substring(0, args[0].length()).equalsIgnoreCase(args[0])
+                    if ((args[0].length() < bind.getKeyDescription().length() && bind.getKeyDescription().substring(0, args[0].length()).equalsIgnoreCase(args[0]))
                             || bind.getKeyDescription().contains(args[0]))
                         aliases.add(bind.getKeyDescription());
                 break;
@@ -223,6 +239,12 @@ public class KeySimCommand implements IClientCommand {
                 aliases.add(TICK);
                 aliases.add(WORLD);
                 aliases.add(SIM);
+                break;
+
+            case 3:
+                aliases.add(String.valueOf(DEFAULT_TICK_RESET));
+                aliases.add("toggle");
+                aliases.add("keyswap");
                 break;
         }
 
