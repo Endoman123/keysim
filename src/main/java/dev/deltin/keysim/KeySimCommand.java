@@ -32,12 +32,13 @@ public class KeySimCommand implements IClientCommand {
     // Command info
     public static final String COMMAND_NAME = "keysim";
     public static final String ALIAS = "/" + COMMAND_NAME;
-    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] [" + TOGGLE + "|" + PRESS + "]";
+    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] [" + TOGGLE + "|" + PRESS + " (ticks)] (switch [true|false])";
     // Reset info
-    public static final List<KeyReset> KeyResets = new ArrayList<>();
-    public static final int TICKS_UNTIL_RESET = 40;
+    private static final List<KeyReset> KeyResets = new ArrayList<>();
+    // private static final int TICKS_UNTIL_RESET = 40;
     // Input
-    public static Robot ROBOT = null;
+    private static Robot ROBOT = null;
+    private static final Field[] VK_KEYCODES = java.awt.event.KeyEvent.class.getDeclaredFields();
 
     public KeySimCommand() {
         try
@@ -89,18 +90,46 @@ public class KeySimCommand implements IClientCommand {
         String keyArg = args[0];
         String methodArg = args[1];
 
+        String pressArg = PRESS;
+        int ticksArg = 40;
+
+        if (args.length >= 3)
+        {
+            pressArg = args[2];
+            if (!pressArg.equals(PRESS) && !pressArg.equals(TOGGLE))
+            {
+                printUsage();
+                return;
+            }
+
+            if (args.length >= 4)
+            {
+                try
+                {
+                    ticksArg = Integer.parseInt(args[3]);
+                    if (ticksArg <= 0)
+                        ticksArg = 40;
+                }
+                catch (NumberFormatException e) {}
+            }
+        }
+
         Minecraft mc = Minecraft.getMinecraft();
 
         for (KeyBinding bind : mc.gameSettings.keyBindings) {
             if (bind.getKeyDescription().equalsIgnoreCase(keyArg)) {
                 System.out.println("Keycode: " + bind.getKeyCode());
                 switch(methodArg) {
-                    case TICK:
-                        KeyBinding.onTick(bind.getKeyCode());
-                        return;
 
+                    case TICK:
                     case WORLD:
-                        trigger = bind;
+
+                        if (pressArg.equals(PRESS))
+                            KeyResets.add(new KeyReset(bind, ticksArg));
+
+                        if (methodArg.equals(TICK)) KeyBinding.onTick(bind.getKeyCode());
+                        else if (methodArg.equals(WORLD)) trigger = bind;
+
                         return;
 
                     case SIM:
@@ -112,8 +141,8 @@ public class KeySimCommand implements IClientCommand {
 
                         try {
                             int key = -1;
-                            Field[] fields = java.awt.event.KeyEvent.class.getDeclaredFields();
-                            for (Field f : fields) {
+
+                            for (Field f : VK_KEYCODES) {
                                 if (Modifier.isStatic(f.getModifiers()) && f.getName().equals("VK_" + bind.getDisplayName())) {
                                     key = (int)f.get(null);
                                 }
@@ -124,12 +153,8 @@ public class KeySimCommand implements IClientCommand {
                                 return;
                             }
 
-                            for (KeyReset kr : KeyResets)
-                                if (kr.GetKeyCode() == key)
-                                    return;
-
                             ROBOT.keyPress(key);
-                            KeyResets.add(new KeyReset(key, methodArg));
+                            KeyResets.add(new KeyReset(key, ticksArg));
                         }
                         catch (IllegalAccessException e)
                         {
@@ -159,10 +184,15 @@ public class KeySimCommand implements IClientCommand {
             for (int i = KeyResets.size() - 1; i >= 0; i--)
             {
                 KeyReset kr = KeyResets.get(i);
-                kr.IncrementTick();
-                if (kr.GetCurrentTick() >= TICKS_UNTIL_RESET) {
-                    System.out.println("Released key after " + kr.GetCurrentTick() + " ticks.");
-                    ROBOT.keyRelease(kr.GetKeyCode());
+                kr.incrementTick();
+                if (kr.getCurrentTick() >= kr.getTickCount()) {
+                    System.out.println("Released key after " + kr.getCurrentTick() + " ticks.");
+
+                    if (kr.isKeybind())
+                        KeyBinding.setKeyBindState(kr.getKeyBinding().getKeyCode(), false);
+                    else
+                        ROBOT.keyRelease(kr.getKeyCode());
+
                     KeyResets.remove(kr);
                 }
             }
