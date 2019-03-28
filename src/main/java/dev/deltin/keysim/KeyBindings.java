@@ -7,7 +7,7 @@ import net.minecraftforge.fml.client.registry.ClientRegistry;
 public class KeyBindings {
     public static KeyBinding dummyKey;
     public static void init() {
-        dummyKey = new KeyBinding("key.dummyKey", Keyboard.KEY_O, "key.categories.KeySim");
+        dummyKey = new KeyBinding("key.dummyKey", Keyboard.KEY_DIVIDE, "key.categories.KeySim");
         ClientRegistry.registerKeyBinding(dummyKey);
     }
 }

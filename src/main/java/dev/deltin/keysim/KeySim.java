@@ -42,7 +42,6 @@ public class KeySim
 
         ClientCommandHandler.instance.registerCommand(new ListKeysCommand());
 
-        //MinecraftForge.EVENT_BUS.register(new KeyInputHandler());
         KeyBindings.init();
 
 

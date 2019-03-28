@@ -30,7 +30,7 @@ public class KeySimCommand implements IClientCommand {
     // Command info
     public static final String COMMAND_NAME = "keysim";
     public static final String ALIAS = "/" + COMMAND_NAME;
-    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] (ticks|toggle|keyswap) (close [true|false])";
+    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] (ticks|toggle|keyswap)";
     // Reset info
     private static final List<KeyReset> KeyResets = new ArrayList<>();
     private static final int DEFAULT_TICK_RESET = 40;
@@ -150,7 +150,6 @@ public class KeySimCommand implements IClientCommand {
 
                         if (methodArg.equals(TICK)) KeyBinding.onTick(bind.getKeyCode());
                         else if (methodArg.equals(WORLD)) trigger = bind;
-                        mc.currentScreen.setFocused(false);
 
                         return;
 
@@ -177,7 +176,6 @@ public class KeySimCommand implements IClientCommand {
                             }
 
                             ROBOT.keyPress(key);
-                            mc.currentScreen.setFocused(false);
                             if (ticksArg != -1)
                                 KeyResets.add(new KeyReset(bind, key, ticksArg, dummyKeyCode, bindKeyCode));
                         }
