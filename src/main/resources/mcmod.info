@@ -1,0 +1,16 @@
+[
+{
+  "modid": "dev.deltin.keysim",
+  "name": "KeySim",
+  "description": "Simulate keypresses with commands.",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "",
+  "updateUrl": "",
+  "authorList": ["Deltin"],
+  "credits": "whats smeltin, deltin?",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
