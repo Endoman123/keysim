@@ -24,17 +24,13 @@ import java.lang.reflect.Field;
 
 public class KeySimCommand implements IClientCommand {
 
-    // Input methods
-    public static final String TICK = "ontick";
-    public static final String WORLD = "world";
-    public static final String SIM = "sim";
     // Command info
     public static final String COMMAND_NAME = "keysim";
     public static final String ALIAS = "/" + COMMAND_NAME;
-    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> (" + SIM + "|" + TICK + "|" + WORLD + ") (ticks|toggle|keyswap)";
+    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> (hold [true|false])";
     // Reset info
-    private static final List<KeyReset> KeyResets = new ArrayList<>();
-    private static final int DEFAULT_TICK_RESET = 40;
+    private static KeyReset KeyResetInfo = null;
+    private static final int DEFAULT_TICK_RESET = 20;
     // Input
     private static Robot ROBOT = null;
     private static final Field[] VK_KEYCODES = java.awt.event.KeyEvent.class.getDeclaredFields();
@@ -81,121 +77,86 @@ public class KeySimCommand implements IClientCommand {
     @Override
     public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
 
+        if (ROBOT == null)
+        {
+            error("Error: ROBOT failed to initialized.");
+            return;
+        }
+
         if (args.length < 1) {
             printUsage();
             return;
         }
 
-        String keyArg = args[0];
+        if (KeyResetInfo != null)
+            return;
 
-        String methodArg = SIM;
-        if (args.length >= 2)
-            methodArg = args[1];
+        // Get the key name argument.
+        String keyName = args[0];
 
-        int ticksArg = DEFAULT_TICK_RESET;
-        Boolean swap = false;
-
-        if (args.length >= 3)
-        {
-            try
+        // Get the hold argument.
+        Boolean hold = false;
+        if (args.length >= 2) {
+            if (args[1].equalsIgnoreCase("true"))
+                hold = true;
+            else if (!args[1].equalsIgnoreCase("false"))
             {
-                ticksArg = Integer.parseInt(args[2]);
-                if (ticksArg <= 0)
-                    ticksArg = DEFAULT_TICK_RESET;
-            }
-            catch (NumberFormatException e)
-            {
-                if (args[2].equalsIgnoreCase("toggle"))
-                    ticksArg = -1;
-                else if (args[2].equalsIgnoreCase("keyswap"))
-                {
-                    swap = true;
-                    ticksArg = DEFAULT_TICK_RESET;
-                }
-                else
-                {
-                    printUsage();
-                    return;
-                }
+                printUsage();
+                return;
             }
         }
 
         Minecraft mc = Minecraft.getMinecraft();
 
+        // Look for the key in the game settings
         for (KeyBinding bind : mc.gameSettings.keyBindings) {
-            if (bind.getKeyDescription().equalsIgnoreCase(keyArg)) {
-                System.out.println("Keycode: " + bind.getKeyCode());
+            if (bind.getKeyDescription().equalsIgnoreCase(keyName)) {
 
-                int dummyKeyCode = -1;
-                int bindKeyCode = -1;
-                if (swap) {
-                    dummyKeyCode = KeyBindings.dummyKey.getKeyCode();
-
-                    if (dummyKeyCode == 0)
-                    {
-                        error("Error: " + KeyBindings.dummyKey.getKeyDescription() + " is not set.");
-                        return;
-                    }
-
-                    KeyBindings.dummyKey.setKeyCode(0);
-
-                    bindKeyCode = bind.getKeyCode();
-                    bind.setKeyCode(dummyKeyCode);
-
-                    KeyBinding.resetKeyBindingArrayAndHash();
+                // Get the dummy key code...
+                int dummyKeyCode = KeyBindings.dummyKey.getKeyCode();
+                if (dummyKeyCode == 0)
+                {
+                    error("Error: " + KeyBindings.dummyKey.getKeyDescription() + " is not set.");
+                    return;
                 }
+                // ...then set it's value to none.
+                KeyBindings.dummyKey.setKeyCode(0);
 
-                switch(methodArg) {
+                // Set the target key code to the old dummy key code.
+                int bindKeyCode = bind.getKeyCode();
+                bind.setKeyCode(dummyKeyCode);
 
-                    case TICK:
-                    case WORLD:
+                // Update the client's key bindings.
+                KeyBinding.resetKeyBindingArrayAndHash();
 
-                        if (ticksArg != -1)
-                            KeyResets.add(new KeyReset(bind, -1, ticksArg, dummyKeyCode, bindKeyCode));
-
-                        Minecraft.getMinecraft().displayGuiScreen(null);
-                        if (methodArg.equals(TICK)) KeyBinding.onTick(bind.getKeyCode());
-                        else if (methodArg.equals(WORLD)) trigger = bind;
-
-                        return;
-
-                    case SIM:
-                        if (ROBOT == null)
-                        {
-                            error("Error: ROBOT failed to initialized.");
-                            return;
-                        }
-
+                // Get the system VK equivalent of the keycode.
+                int vk = -1;
+                for (Field f : VK_KEYCODES) {
+                    if (Modifier.isStatic(f.getModifiers()) && f.getName().equals("VK_" + bind.getDisplayName())) {
                         try {
-                            int key = -1;
-
-                            for (Field f : VK_KEYCODES) {
-                                if (Modifier.isStatic(f.getModifiers()) && f.getName().equals("VK_" + bind.getDisplayName())) {
-                                    key = (int)f.get(null);
-                                    System.out.println("Keycode: " + f.getName() + " (" + key + ")");
-                                }
-                            }
-
-                            if (key == -1) {
-                                error("Error: Invalid key " + bind.getDisplayName() + " (" + "VK_" + bind.getDisplayName() + "), rebind it to something else!");
-                                return;
-                            }
-
-                            Minecraft.getMinecraft().displayGuiScreen(null);
-                            ROBOT.keyPress(key);
-                            if (ticksArg != -1)
-                                KeyResets.add(new KeyReset(bind, key, ticksArg, dummyKeyCode, bindKeyCode));
+                            vk = (int) f.get(null);
                         }
-                        catch (IllegalAccessException e)
-                        {
+                        catch(IllegalAccessException e) {
                             error("Error: \"" + e.getMessage() + "\"");
                         }
-                        return;
-
-                    default:
-                        printUsage();
-                        return;
+                        break;
+                    }
                 }
+
+                if (vk == -1) {
+                    error("Error: Invalid key " + bind.getDisplayName() + " (" + "VK_" + bind.getDisplayName() + "), rebind it to something else!");
+                    return;
+                }
+
+                // Close whatever GUI that might be opened.
+                Minecraft.getMinecraft().displayGuiScreen(null);
+
+                // Press down.
+                System.out.println("Pressing down on " + vk);
+                ROBOT.keyPress(vk);
+
+                KeyResetInfo = new KeyReset(bind, vk, DEFAULT_TICK_RESET, dummyKeyCode, bindKeyCode, hold);
+                return;
             }
         }
 
@@ -205,35 +166,31 @@ public class KeySimCommand implements IClientCommand {
     @SubscribeEvent
     public void keyUpdate(TickEvent event) { // TickEvent  /  ClientTickEvent?
 
-        if (trigger != null) {
-            KeyBinding.setKeyBindState(trigger.getKeyCode(), true);
-            trigger = null;
-        }
-
         if (event.phase == TickEvent.Phase.START)
-            for (int i = KeyResets.size() - 1; i >= 0; i--)
+            if (KeyResetInfo != null && KeyResetInfo.incrementTick())
             {
-                KeyReset kr = KeyResets.get(i);
-                if (kr.incrementTick()) {
-                    System.out.println("Released key after " + kr.getCurrentTick() + " ticks.");
+                System.out.println("Releasing " + KeyResetInfo.getSystemVK());
 
-                    if (kr.doSystemInput())
-                        ROBOT.keyRelease(kr.getSystemVK());
-                    else
-                        KeyBinding.setKeyBindState(kr.getKeyBinding().getKeyCode(), false);
+                // Release the key, or key up.
+                ROBOT.keyRelease(KeyResetInfo.getSystemVK());
 
-                    if (kr.doKeySwap())
-                    {
-                        KeyBindings.dummyKey.setKeyCode(kr.getDummyKeyCode());
-                        kr.getKeyBinding().setKeyCode(kr.getBindKeyCode());
-                        KeyBinding.resetKeyBindingArrayAndHash();
-                    }
+                // Reset bindings.
+                KeyBindings.dummyKey.setKeyCode(KeyResetInfo.getDummyKeyCode());
+                KeyResetInfo.getKeyBinding().setKeyCode(KeyResetInfo.getBindKeyCode());
 
-                    KeyResets.remove(kr);
+                // Update the key states.
+                if (!KeyResetInfo.shouldHold()) {
+                    KeyBinding.setKeyBindState(KeyResetInfo.getBindKeyCode(), false);
+                    KeyBinding.setKeyBindState(KeyResetInfo.getDummyKeyCode(), false);
                 }
+
+                // Update the client's key bindings.
+                KeyBinding.resetKeyBindingArrayAndHash();
+
+                // Done.
+                KeyResetInfo = null;
             }
     }
-    private KeyBinding trigger = null;
 
     // Checks if the player can execute the command.
     @Override
@@ -256,16 +213,8 @@ public class KeySimCommand implements IClientCommand {
                 break;
 
             case 2:
-                aliases.add(TICK);
-                aliases.add(WORLD);
-                aliases.add(SIM);
-                break;
-
-            case 3:
-                aliases.add(String.valueOf(DEFAULT_TICK_RESET));
-                aliases.add("toggle");
-                aliases.add("keyswap");
-                break;
+                aliases.add("true");
+                aliases.add("false");
         }
 
         return aliases;

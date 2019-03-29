@@ -11,29 +11,27 @@ public class KeyReset {
     private int tickCount;
     private int dummyKeyCode;
     private int bindKeyCode;
+    private Boolean hold;
 
     private int tick = 0;
 
-    public KeyReset(KeyBinding keybind, int systemVK, int tickCount, int dummyKeyCode, int bindKeyCode) {
+    public KeyReset(KeyBinding keybind, int systemVK, int tickCount, int dummyKeyCode, int bindKeyCode, Boolean hold) {
         this.keyBinding = keybind;
         this.systemVK = systemVK;
         this.tickCount = tickCount;
         this.dummyKeyCode = dummyKeyCode;
         this.bindKeyCode = bindKeyCode;
+        this.hold = hold;
     }
 
     public Boolean incrementTick() {
         tick++;
         return tick >= tickCount;
     }
-    public int getCurrentTick() { return tick; }
 
     public KeyBinding getKeyBinding() { return keyBinding; }
-
-    public Boolean doSystemInput() { return systemVK != -1; }
     public int getSystemVK() { return systemVK; }
-
-    public Boolean doKeySwap() { return dummyKeyCode != -1 && bindKeyCode != -1; }
     public int getDummyKeyCode() { return dummyKeyCode; }
     public int getBindKeyCode() { return bindKeyCode; }
+    public Boolean shouldHold() { return hold; }
 }
