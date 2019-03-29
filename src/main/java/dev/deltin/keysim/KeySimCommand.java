@@ -1,6 +1,7 @@
 package dev.deltin.keysim;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiScreen;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.command.CommandException;
 import net.minecraft.command.ICommand;
@@ -30,7 +31,7 @@ public class KeySimCommand implements IClientCommand {
     // Command info
     public static final String COMMAND_NAME = "keysim";
     public static final String ALIAS = "/" + COMMAND_NAME;
-    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> [" + SIM + "|" + TICK + "|" + WORLD + "] (ticks|toggle|keyswap)";
+    public static final String USAGE = TextFormatting.RED + "Usage: /" + COMMAND_NAME + " <key> (" + SIM + "|" + TICK + "|" + WORLD + ") (ticks|toggle|keyswap)";
     // Reset info
     private static final List<KeyReset> KeyResets = new ArrayList<>();
     private static final int DEFAULT_TICK_RESET = 40;
@@ -80,13 +81,17 @@ public class KeySimCommand implements IClientCommand {
     @Override
     public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
 
-        if (args.length < 2) {
+        if (args.length < 1) {
             printUsage();
             return;
         }
 
         String keyArg = args[0];
-        String methodArg = args[1];
+
+        String methodArg = SIM;
+        if (args.length >= 2)
+            methodArg = args[1];
+
         int ticksArg = DEFAULT_TICK_RESET;
         Boolean swap = false;
 
@@ -148,6 +153,7 @@ public class KeySimCommand implements IClientCommand {
                         if (ticksArg != -1)
                             KeyResets.add(new KeyReset(bind, -1, ticksArg, dummyKeyCode, bindKeyCode));
 
+                        Minecraft.getMinecraft().displayGuiScreen(null);
                         if (methodArg.equals(TICK)) KeyBinding.onTick(bind.getKeyCode());
                         else if (methodArg.equals(WORLD)) trigger = bind;
 
@@ -175,6 +181,7 @@ public class KeySimCommand implements IClientCommand {
                                 return;
                             }
 
+                            Minecraft.getMinecraft().displayGuiScreen(null);
                             ROBOT.keyPress(key);
                             if (ticksArg != -1)
                                 KeyResets.add(new KeyReset(bind, key, ticksArg, dummyKeyCode, bindKeyCode));
