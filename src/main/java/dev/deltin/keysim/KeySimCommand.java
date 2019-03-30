@@ -31,6 +31,7 @@ public class KeySimCommand implements IClientCommand {
     // Reset info
     private static KeyReset KeyResetInfo = null;
     private static final int DEFAULT_TICK_RESET = 20;
+    private final Object lock = new Object();
     // Input
     private static Robot ROBOT = null;
     private static final Field[] VK_KEYCODES = java.awt.event.KeyEvent.class.getDeclaredFields();
@@ -166,9 +167,8 @@ public class KeySimCommand implements IClientCommand {
     @SubscribeEvent
     public void keyUpdate(TickEvent event) { // TickEvent  /  ClientTickEvent?
 
-        if (event.phase == TickEvent.Phase.START)
-            if (KeyResetInfo != null && KeyResetInfo.incrementTick())
-            {
+        synchronized (lock) {
+            if (event.phase == TickEvent.Phase.START && KeyResetInfo != null && KeyResetInfo.incrementTick()) {
                 System.out.println("Releasing " + KeyResetInfo.getSystemVK());
 
                 // Release the key, or key up.
@@ -190,6 +190,7 @@ public class KeySimCommand implements IClientCommand {
                 // Done.
                 KeyResetInfo = null;
             }
+        }
     }
 
     // Checks if the player can execute the command.
